@@ -16,8 +16,16 @@ In this document, I will try to go through its mechanics and provide some insigh
  gfold :: (Context a b -> [Node]) -> (Context a b -> c -> d) -> (Maybe d -> c -> c, c) -> [Node] -> gr a b -> c
 ```
 
-There are three kinds of functions that do the work here, fold direction, depth aggregation, and breadth aggregation. Below we will go through each one, often
-using our example graph:
+There are three kinds of functions that do the work here, fold direction, depth aggregation, and breadth aggregation.
+In my opinion, depth aggregation is a bit of a distracting misnomer. The difference between the two is that "depth"
+aggregation is context-centric (you can think of it as being node-centric too) and computes some function at the node level.
+The breadth aggregation combines many such function outputs.
+
+The general flow is, use the context and a running value to produce a context summary,
+then combine many context summaries into a running value. There is a back and forth there
+that makes conceiving of differing types (the `c` and `d`) a bit difficult.
+
+Below we will go through each of these function types, using our example graph:
 
 ```
          A
