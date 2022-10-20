@@ -87,7 +87,7 @@ First, they don't *have* to be different. In many cases they will be the same.
 
 ## Deconstructions
 
-Like many funcitons in `fgl`, `gfold` works by called `match` recursively,
+Like many funcitons in `fgl`, `gfold` works by calling `match` recursively,
 which *decomposes* the graph as it goes. Graph decomposition means that a
 visited node is *removed* from the graph.  This can create odd results if you
 are expecting the graph to be static as the fold progresses.
