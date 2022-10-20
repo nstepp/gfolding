@@ -170,7 +170,7 @@ actuallySumEdges g = sum $ map edgeLabel (labEdges g)
 ```
 
 ```
-> sum $ map edgeLabel (labEdges g)
+> actuallySumEdges g
 14
 ```
 
