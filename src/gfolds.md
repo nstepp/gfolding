@@ -33,6 +33,19 @@ using our example graph:
          D       E
 ```
 
+Or if your markdown viewer can do mermaid:
+
+```mermaid
+flowchart TD
+    A -->|1| B
+    A -->|2| C
+    B -->|3| C
+    C -->|1| D
+    C -->|2| E
+    D -->|5| B
+```
+In `fgl`, this graph is defined:
+
 ```haskell
 g :: Gr Char Int
 g = mkGraph [(0,'A'),(1,'B'),(2,'C'),(3,'D'),(4,'E')] [(0,1,1),(0,2,2),(1,2,3),(2,3,1),(2,4,2),(3,1,5)]
