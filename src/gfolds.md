@@ -85,13 +85,127 @@ followMax ctx =
 
 ## Depth aggregation
 
+```haskell
+type DepthAgg a b c d = Context a b -> c -> d
+```
+
 The next function takes a context, and combines it with the accumulated value
-(`c`), returning a possibly different type (`d`). This is the first place where
-things can get confusing, because it may not be immediately obvious why or how
-one would return this new type, especially when it will later be combined with
-a `c` again.
+(`c`), returning a possibly different type (`d`).
+
+One can think of the depth function as a context function composed with an aggregation function, e.g.
+
+```haskell
+mkDepthAgg :: (Context a b -> d') -> (d' -> c -> d) -> (Context a b -> c -> d)
+mkDepthAgg f g = g . f
+```
+
+This is the first place where things can get confusing, because it may not be
+immediately obvious why or how one would return this new type, especially when
+it will later be combined with a `c` again.
 
 First, they don't *have* to be different. In many cases they will be the same.
+For example, counting or summing folds will typically have `c` and `d` as
+ether `Int` or `Float`.
+
+In order to show a few examples, we will need to use breadth aggregation,
+which will not be covered in detail until the next section. In order to make the
+folds readable, we'll introduce the `maybeAgg` function, which constructs
+a breadth aggregation function out of a a simpler `d -> c -> c` function.
+
+```haskell
+-- Utility to deal with the Maybe in the gfold breadth aggregation function.
+maybeAgg :: (d -> c -> c) -> Maybe d -> c -> c
+maybeAgg f md c = maybe c (flip f c)  md
+```
+All we need to know now is that something like `maybeAgg (+)` will
+construct a summing aggregation.
+
+With that, an example depth aggregation with `c ~ d` would be:
+
+```haskell
+countAgg :: Context a b -> Int -> Int
+countAgg _ c = c+1
+
+countNodes :: Gr a b -> Int
+countNodes = gfold suc' countAgg (maybeAgg (+),0) [0]
+```
+
+```
+> countNodes g
+5
+```
+
+As discussed, however, depth aggregation and breadth aggregation do not
+have the same type in general. The examples that follow demonstrate
+different ways that this can happpen. The tricky bit is that `c` and `d`
+need to be combined *somehow* in both aggregation functions.
+
+### Delayed Computation
+
+One application is to delay some kind of computation until the next aggregation step.
+For instance, suppose that I want to compute an edge quantity that decays
+by degree (which is a strange function indeed). I might create functions such as
+
+
+```haskell
+countSucAgg :: Context a Int -> c -> (Int, Int, c)
+countSucAgg ctx c =
+    let outDegree = outdeg' ctx
+        sucWeights = map snd $ lsuc' ctx
+    in (outDegree, sum sucWeights, c)
+
+aggNorm (d,n,c) c' =
+    if d > 0
+    then (c+c'+fromIntegral n)/fromIntegral d
+    else 0.0
+
+normedPath :: Gr Char Int -> Float
+normedPath = gfold suc' countSucAgg (maybeAgg aggNorm,0.0) [0]
+```
+
+```
+> normedPath g
+3.75
+```
+
+### Keeping State
+
+A related application is to thread some kind of state between
+the aggregations.
+
+## Breadth Aggregation
+
+This function is a bit easier to understand. It is used (internally to `gfold`)
+to fold the results of depth aggregations into the result value. Unfortunately,
+the specification leaks some of the implementaiton of `gfold` by requiring
+`Maybe d`. In practice, this will always be a `Just` value. The `Maybe` comes
+from the fact that the nodes produced by the fold direction function may not exist
+in the graph. For well formed folds you should not experience a `Nothing`.
+
+As a quick example of this, cosider this fold:
+
+```haskell
+countNothing :: Node -> Gr Char Int -> Int
+countNothing n = gfold suc' (\_ c -> c) (\md c -> maybe (c+1) (const c) md,0) [n]
+```
+
+If we start at an existing node, we do not see any `Nothing`s.
+
+```
+> countNothing 0 g
+0
+```
+
+If we start at an invalid node, we do.
+
+
+```
+> countNothing 9 g
+1
+```
+
+Likewise, if we did not use `suc'`, but a function that could produce invalid nodes (or nodes that no longer
+existed in a decomposed graph) then we might also see `Nothing`.
 
 ## Deconstructions
 
@@ -102,11 +216,8 @@ are expecting the graph to be static as the fold progresses.
 
 Consider this fold:
 
-```haskell
--- Utility to deal with the Maybe in the gfold breadth aggregation function.
-maybeAgg :: (d -> c -> c) -> Maybe d -> c -> c
-maybeAgg f md c = maybe c (flip f c)  md
 
+```haskell
 collectLabels :: Gr Char Int -> String
 collectLabels = gfold suc' (\ctx c -> (lab' ctx):c) (maybeAgg (++),"") [0]
 ```
