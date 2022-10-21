@@ -143,7 +143,8 @@ type DepthAgg a b c d = Context a b -> c -> d
 The next function takes a context, and combines it with the accumulated value
 (`c`), returning a possibly different type (`d`).
 
-One can think of the depth function as a context function composed with an aggregation function, e.g.
+In many cases, one can think of the depth function as a context function
+composed with an aggregation function, e.g.
 
 ```haskell
 mkDepthAgg :: (Context a b -> d') -> (d' -> c -> d) -> (Context a b -> c -> d)
