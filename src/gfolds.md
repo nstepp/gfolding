@@ -127,7 +127,7 @@ a breadth aggregation function out of a a simpler `d -> c -> c` function.
 ```haskell
 -- Utility to deal with the Maybe in the gfold breadth aggregation function.
 maybeAgg :: (d -> c -> c) -> Maybe d -> c -> c
-maybeAgg f md c = maybe c (flip f c)  md
+maybeAgg f md c = maybe c (flip f c) md
 ```
 
 Now something like `maybeAgg (+)` will construct a summing aggregation. In fact,
@@ -232,7 +232,7 @@ Just (Node 'A' [Node 'B' [Node 'C' [Node 'D' [],Node 'E' []]]])
 ```
 
 In this mode, depth and breadth take turns wrapping and collecting levels of the
-recursion. We can make this back and forth explicit by making a very general
+recursion. We can make this back and forth explicit by making very general
 (and useless) types,
 
 ```haskell
