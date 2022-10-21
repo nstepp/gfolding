@@ -152,7 +152,7 @@ mkDepthAgg f g = g . f
 ```
 
 This is the first place where things can get confusing, because it may not be
-immediately obvious why or how one would return this new type, especially when
+immediately obvious why or how one would return this new type (`d`), especially when
 it will later be combined with a `c` again.
 
 First, they don't *have* to be different. In many cases they will be the same.
