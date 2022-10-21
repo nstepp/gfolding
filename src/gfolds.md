@@ -82,6 +82,57 @@ followMax ctx =
         then []
         else [fst $ maximumBy (compare `on` snd) sucs]
 ```
+## Breadth Aggregation
+
+```haskell
+type BreadthAgg c d = Maybe d -> c -> c
+```
+
+This function is a bit easier to understand, so we'll look at it before depth
+aggregation. It is used (internally to `gfold`) to fold the results of depth
+aggregations into the result value. Unfortunately, the specification leaks some
+of the implementaiton of `gfold` by requiring `Maybe d`. In practice, this will
+always be a `Just` value. The `Maybe` comes from the fact that the nodes
+produced by the fold direction function may not exist in the graph. For well
+formed folds you should not experience a `Nothing`.
+
+As a quick example of this, cosider this fold:
+
+```haskell
+countNothing :: Node -> Gr Char Int -> Int
+countNothing n = gfold suc' (\_ c -> c) (\md c -> maybe (c+1) (const c) md,0) [n]
+```
+
+If we start at an existing node, we do not see any `Nothing`s.
+
+```
+> countNothing 0 g
+0
+```
+
+If we start at an invalid node, we do.
+
+
+```
+> countNothing 9 g
+1
+```
+
+Likewise, if we did not use `suc'`, but a function that could produce invalid nodes (or nodes that no longer
+existed in a decomposed graph) then we might also see `Nothing`.
+
+To handle the `Maybe`, we'll introduce the `maybeAgg` function, which constructs
+a breadth aggregation function out of a a simpler `d -> c -> c` function.
+
+```haskell
+-- Utility to deal with the Maybe in the gfold breadth aggregation function.
+maybeAgg :: (d -> c -> c) -> Maybe d -> c -> c
+maybeAgg f md c = maybe c (flip f c)  md
+```
+
+Now something like `maybeAgg (+)` will construct a summing aggregation. In fact,
+when `c ~ d`, many monoidal operations will be useful, e.g. `maybeAgg (:)`,
+`maybeAgg max`, or `maybeAgg (<>)`.
 
 ## Depth aggregation
 
@@ -107,20 +158,7 @@ First, they don't *have* to be different. In many cases they will be the same.
 For example, counting or summing folds will typically have `c` and `d` as
 ether `Int` or `Float`.
 
-In order to show a few examples, we will need to use breadth aggregation,
-which will not be covered in detail until the next section. In order to make the
-folds readable, we'll introduce the `maybeAgg` function, which constructs
-a breadth aggregation function out of a a simpler `d -> c -> c` function.
-
-```haskell
--- Utility to deal with the Maybe in the gfold breadth aggregation function.
-maybeAgg :: (d -> c -> c) -> Maybe d -> c -> c
-maybeAgg f md c = maybe c (flip f c)  md
-```
-All we need to know now is that something like `maybeAgg (+)` will
-construct a summing aggregation.
-
-With that, an example depth aggregation with `c ~ d` would be:
+An example depth aggregation with `c ~ d` would be:
 
 ```haskell
 countAgg :: Context a b -> Int -> Int
@@ -168,44 +206,46 @@ normedPath = gfold suc' countSucAgg (maybeAgg aggNorm,0.0) [0]
 3.75
 ```
 
-### Keeping State
+### Recursive Data Structures
 
-A related application is to thread some kind of state between
-the aggregations.
-
-## Breadth Aggregation
-
-This function is a bit easier to understand. It is used (internally to `gfold`)
-to fold the results of depth aggregations into the result value. Unfortunately,
-the specification leaks some of the implementaiton of `gfold` by requiring
-`Maybe d`. In practice, this will always be a `Just` value. The `Maybe` comes
-from the fact that the nodes produced by the fold direction function may not exist
-in the graph. For well formed folds you should not experience a `Nothing`.
-
-As a quick example of this, cosider this fold:
+A natural place where differing (but related) types show up is in recursive data structures.
+Consider a `Tree` definition,
 
 ```haskell
-countNothing :: Node -> Gr Char Int -> Int
-countNothing n = gfold suc' (\_ c -> c) (\md c -> maybe (c+1) (const c) md,0) [n]
+data Tree a = Node a [Tree a] deriving Show
 ```
 
-If we start at an existing node, we do not see any `Nothing`s.
+We can convert a graph into a spanning tree using
 
-```
-> countNothing 0 g
-0
-```
-
-If we start at an invalid node, we do.
-
-
-```
-> countNothing 9 g
-1
+```haskell
+spanningTree :: Gr Char Int -> Maybe (Tree Char)
+spanningTree = maybeHead . gfold suc' (Node . lab') (maybeAgg (:),[]) [0]
+  where
+    maybeHead [] = Nothing
+    maybeHead xs = Just (head xs)
 ```
 
-Likewise, if we did not use `suc'`, but a function that could produce invalid nodes (or nodes that no longer
-existed in a decomposed graph) then we might also see `Nothing`.
+```
+> spanningTree g
+Just (Node 'A' [Node 'B' [Node 'C' [Node 'D' [],Node 'E' []]]])
+```
+
+In this mode, depth and breadth take turns wrapping and collecting levels of the
+recursion. We can make this back and forth explicit by making a very general
+(and useless) types,
+
+```haskell
+data Depth a = D a (Breadth a) deriving Show
+data Breadth a = B (Depth a) (Breadth a) | Init deriving Show
+
+foldStructure :: Gr a b -> Breadth a
+foldStructure = gfold suc' (D . lab') (maybeAgg B,Init) [0]
+```
+
+```
+> foldStructure g
+B (D 'A' (B (D 'B' (B (D 'C' (B (D 'D' Init) (B (D 'E' Init) Init))) Init)) Init)) Init
+```
 
 ## Deconstructions
 
