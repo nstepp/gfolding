@@ -321,12 +321,15 @@ sumEdges = gfold suc' (\ctx c -> c + sum (map snd (lsuc' ctx))) (maybeAgg (+), 0
 
 Hmm, we expect `1+2+3+1+2+5 = 14`! The difference is of course what we saw in
 `collectSucs`. The edge from `D` to `B` gets deleted before we visit `D`, along
-with its label. As such, `gfold` is not always the right answer. If you need to
-access every edge, there are other tools, e.g.:
+with its label.
+
+There is usually a way around this, if you are keeping deconstruction in mind. For
+instance, we can replace `lsuc'` with `lneighbors'`. In our nondeconstructing way
+of thinking, it would seem like this double counts weights, but as we see...
 
 ```haskell
 actuallySumEdges :: Gr Char Int -> Int
-actuallySumEdges g = sum $ map edgeLabel (labEdges g)
+actuallySumEdges = gfold suc' (\ctx c -> c + sum (map fst (lneighbors' ctx))) (maybeAgg (+), 0) [0]
 ```
 
 ```
@@ -334,4 +337,16 @@ actuallySumEdges g = sum $ map edgeLabel (labEdges g)
 14
 ```
 
+Of course, `gfold` is not always the right answer. If you need to
+access every edge, there are other tools, e.g.:
+
+```haskell
+nofoldSumEdges :: Gr Char Int -> Int
+nofoldSumEdges g = sum $ map edgeLabel (labEdges g)
+```
+
+```
+> nofoldSumEdges g
+14
+```
 
